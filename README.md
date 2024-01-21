@@ -1,5 +1,7 @@
 # JYCM-JS
 
+[![Coverage Status](https://coveralls.io/repos/github/eggachecat/jycm-js/badge.svg?branch=main)](https://coveralls.io/github/eggachecat/jycm-js?branch=main)
+
 This is the JS-Implementation for [JYCM](https://github.com/eggachecat/jycm).
 
 Together with its [renderer](https://github.com/eggachecat/react-jycm-viewer/)
