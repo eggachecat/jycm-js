@@ -1,0 +1,30 @@
+{
+  "name": "jycm",
+  "version": "0.0.1",
+  "description": "JS implementation for jycm",
+  "author": "sunao_0626@hotmail.com",
+  "license": "MIT",
+  "homepage": "https://github.com/eggachecat/jycm-js",
+  "repository": "https://github.com/eggachecat/jycm-js",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "typings": "dist/index.d.ts",
+  "devDependencies": {
+    "@babel/core": "^7.23.7",
+    "@babel/preset-env": "^7.23.8",
+    "@types/jest": "^29.5.11",
+    "babel-loader": "^9.1.3",
+    "core-js": "^3.35.0",
+    "jest": "^29.7.0",
+    "regenerator-runtime": "^0.14.1",
+    "ts-jest": "^29.1.1",
+    "ts-loader": "^9.5.1",
+    "typescript": "^5.3.3",
+    "webpack": "^5.89.0",
+    "webpack-cli": "^5.1.4"
+  },
+  "scripts": {
+    "build": "webpack --config webpack.config.js",
+    "test": "jest"
+  }
+}

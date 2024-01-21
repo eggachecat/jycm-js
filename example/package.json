@@ -1,0 +1,10 @@
+{
+  "name": "jycm-example",
+  "version": "1.0.0",
+  "description": "Example for using jycm (Node)",
+  "main": "index.ts",
+  "license": "MIT",
+  "dependencies": {
+    "jycm": "^0.0.1"
+  }
+}
