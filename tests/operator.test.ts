@@ -1,8 +1,11 @@
 import { make_ignore_order_func } from '../src/helper';
 import { YouchamaJsonDiffer } from '../src/jycm';
+import { get_jycm_instance_from_json } from '../src/index';
+
 import {
     ExpectChangeOperator,
-    ListItemFieldMatchOperator
+    ListItemFieldMatchOperator,
+    getOperatorListFromJSON
 } from '../src/operator';
 
 describe('testing with operator:ListItemFieldMatchOperator', () => {
@@ -149,16 +152,40 @@ describe('testing with operator:ListItemFieldMatchOperator', () => {
             ]
         };
 
-        const ycm = new YouchamaJsonDiffer(left, right, {
-            custom_operators: [
-                new ListItemFieldMatchOperator(
-                    '^ignore_order->\\[\\d+\\]$',
-                    'id'
-                )
-            ],
-            ignore_order_func: make_ignore_order_func(['^ignore_order$'])
-        });
-        expect(ycm.get_diff(true)).toStrictEqual(expected);
+        expect(
+            new YouchamaJsonDiffer(left, right, {
+                custom_operators: [
+                    new ListItemFieldMatchOperator(
+                        '^ignore_order->\\[\\d+\\]$',
+                        'id'
+                    )
+                ],
+                ignore_order_func: make_ignore_order_func(['^ignore_order$'])
+            }).get_diff(true)
+        ).toStrictEqual(expected);
+
+        expect(
+            new YouchamaJsonDiffer(left, right, {
+                custom_operators: getOperatorListFromJSON([
+                    {
+                        name: 'operator:list:matchWithField',
+                        args: ['^ignore_order->\\[\\d+\\]$', 'id']
+                    }
+                ]),
+                ignore_order_func: make_ignore_order_func(['^ignore_order$'])
+            }).get_diff(true)
+        ).toStrictEqual(expected);
+        expect(
+            get_jycm_instance_from_json(left, right, {
+                operators: [
+                    {
+                        name: 'operator:list:matchWithField',
+                        args: ['^ignore_order->\\[\\d+\\]$', 'id']
+                    }
+                ],
+                ignore_orders: ['^ignore_order$']
+            }).get_diff(true)
+        ).toStrictEqual(expected);
     });
 });
 
@@ -204,13 +231,35 @@ describe('testing with operator:ExpectChangeOperator', () => {
             ]
         };
 
-        const ycm = new YouchamaJsonDiffer(left, right, {
-            custom_operators: [
-                new ExpectChangeOperator('^value_expected_change_.*$')
-            ]
-        });
+        expect(
+            new YouchamaJsonDiffer(left, right, {
+                custom_operators: [
+                    new ExpectChangeOperator('^value_expected_change_.*$')
+                ]
+            }).get_diff(true)
+        ).toStrictEqual(expected);
 
-        const actual = ycm.get_diff(true);
-        expect(JSON.stringify(actual)).toMatch(JSON.stringify(expected));
+        expect(
+            new YouchamaJsonDiffer(left, right, {
+                custom_operators: getOperatorListFromJSON([
+                    {
+                        name: 'operator:primitive:expectChange',
+                        args: ['^value_expected_change_.*$']
+                    }
+                ])
+            }).get_diff(true)
+        ).toStrictEqual(expected);
+        expect(
+            get_jycm_instance_from_json(left, right, {
+                operators: [
+                    {
+                        name: 'operator:primitive:expectChange',
+                        args: ['^value_expected_change_.*$']
+                    }
+                ]
+            }).get_diff(true)
+        ).toStrictEqual(expected);
+
+        get_jycm_instance_from_json;
     });
 });

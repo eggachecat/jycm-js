@@ -1,7 +1,6 @@
 import { TreeLevel, YouchamaJsonDiffer } from './jycm';
 
 export type IJYCMOperator = {
-    __operator_name__: string;
     __event__?: string;
     match: (level: TreeLevel) => boolean;
     diff: (
@@ -10,6 +9,24 @@ export type IJYCMOperator = {
         drill: boolean
     ) => { skip: boolean; score: number };
 };
+
+interface IJYCMOperatorConstructor {
+    new (...args: any[]): IJYCMOperator;
+}
+
+export const OPERATOR_MAPPING: { [_: string]: IJYCMOperatorConstructor } = {};
+
+export function register_operator(name: string, cls: IJYCMOperatorConstructor) {
+    OPERATOR_MAPPING[name] = cls;
+}
+
+export function getOperatorListFromJSON(
+    configList: { name: string; args: any }[]
+) {
+    return configList.map(
+        ({ name, args }) => new OPERATOR_MAPPING[name](...args)
+    );
+}
 
 export class BaseOperator {
     path_regex: string;
@@ -51,6 +68,8 @@ export class ListItemFieldMatchOperator
     }
 }
 
+register_operator('operator:list:matchWithField', ListItemFieldMatchOperator);
+
 export class ExpectChangeOperator
     extends BaseOperator
     implements IJYCMOperator
@@ -79,3 +98,4 @@ export class ExpectChangeOperator
         return { skip: false, score: -1 };
     }
 }
+register_operator('operator:primitive:expectChange', ExpectChangeOperator);

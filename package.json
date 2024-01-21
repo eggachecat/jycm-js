@@ -1,6 +1,6 @@
 {
   "name": "jycm",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "JS implementation for jycm",
   "author": "sunao_0626@hotmail.com",
   "license": "MIT",
@@ -25,6 +25,7 @@
   },
   "scripts": {
     "build": "webpack --config webpack.config.js",
-    "test": "jest"
+    "test": "jest",
+    "pub": "npm version patch --force && npm publish"
   }
 }

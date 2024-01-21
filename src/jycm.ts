@@ -9,7 +9,7 @@ import {
     make_json_path_key
 } from './helper';
 import { KMMatcher } from './km_matcher';
-import { IJYCMOperator } from './operator';
+import { IJYCMOperator, getOperatorListFromJSON } from './operator';
 
 type TreeLevelDiffFunction = (
     treeLevel: TreeLevel,
@@ -937,3 +937,4 @@ export class YouchamaJsonDiffer {
         return this.to_dict(no_pairs);
     }
 }
+
