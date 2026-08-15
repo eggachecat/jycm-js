@@ -1,6 +1,17 @@
 import { KMMatcher } from '../src/km_matcher';
 
 describe('testing general', () => {
+    test('reports verbose matching diagnostics', () => {
+        const log = jest.spyOn(console, 'log').mockImplementation(() => {});
+        const [sum, pairs] = new KMMatcher([[1]]).solve(true);
+
+        expect(sum).toBe(1);
+        expect(pairs).toStrictEqual([[0, 0]]);
+        expect(log).toHaveBeenCalledWith('match 0 to 0, weight 1.0000');
+        expect(log).toHaveBeenCalledWith('ans: 1.0000');
+        log.mockRestore();
+    });
+
     test('test KMMatcher', () => {
         const matcher = new KMMatcher([
             [2, 3, 0, 3],

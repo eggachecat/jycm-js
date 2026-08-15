@@ -2,8 +2,11 @@ import {
     JsonPatchError,
     JsonPatchTestFailed,
     ListItemFieldMatchOperator,
+    PLACE_HOLDER_NON_EXIST,
+    TreeLevel,
     YouchamaJsonDiffer,
     apply_json_patch,
+    get_jycm_instance_from_json,
     make_ignore_order_func
 } from '../src/index';
 
@@ -173,6 +176,34 @@ describe('RFC 6902 JSON Patch', () => {
         expect(shrink.applyPatch(undefined, patch)).toStrictEqual({
             values: [1]
         });
+    });
+
+    test('keeps public path and declarative configuration helpers stable', () => {
+        const rightOnly = new TreeLevel(
+            PLACE_HOLDER_NON_EXIST,
+            { active: true },
+            [],
+            ['settings'],
+            null
+        );
+        expect(rightOnly.get_path()).toBe('settings');
+        expect(JSON.parse(rightOnly.toString())).toStrictEqual({
+            left: PLACE_HOLDER_NON_EXIST,
+            right: { active: true },
+            left_path: [],
+            right_path: ['settings']
+        });
+
+        expect(
+            get_jycm_instance_from_json({}, {}, {}).get_diff(true)
+        ).toStrictEqual({});
+
+        const nestedLists = new YouchamaJsonDiffer(
+            { values: [[1, 2], [3]] },
+            { values: [[3], [1, 2]] },
+            { ignore_order_func: make_ignore_order_func(['^values$']) }
+        );
+        expect(nestedLists.toJsonPatch()).toStrictEqual([]);
     });
 
     test('respects ignore-order and field matching business semantics', () => {
