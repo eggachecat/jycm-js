@@ -11,6 +11,7 @@ import {
 import { KMMatcher } from './km_matcher';
 import { IJYCMOperator, getOperatorListFromJSON } from './operator';
 import { JsonPatchOperation, apply_json_patch, make_json_patch } from './patch';
+import { BusinessDiffPolicy, BusinessPolicyInput } from './policy';
 
 type TreeLevelDiffFunction = (
     treeLevel: TreeLevel,
@@ -158,50 +159,6 @@ class ListItemPair {
 type TreeLevelDiffFunc = (level: TreeLevel, drill: boolean) => boolean;
 type RecordList = Array<JYCMRecord>;
 
-function jsonValueEqual(left: any, right: any): boolean {
-    if (left === right) return true;
-    if (Array.isArray(left) && Array.isArray(right)) {
-        return (
-            left.length === right.length &&
-            left.every((value, index) => jsonValueEqual(value, right[index]))
-        );
-    }
-    if (
-        left !== null &&
-        right !== null &&
-        typeof left === 'object' &&
-        typeof right === 'object' &&
-        !Array.isArray(left) &&
-        !Array.isArray(right)
-    ) {
-        const leftKeys = Object.keys(left);
-        const rightKeys = Object.keys(right);
-        return (
-            leftKeys.length === rightKeys.length &&
-            leftKeys.every(
-                (key) =>
-                    Object.prototype.hasOwnProperty.call(right, key) &&
-                    jsonValueEqual(left[key], right[key])
-            )
-        );
-    }
-    return false;
-}
-
-function unorderedListEqual(left: any[], right: any[]): boolean {
-    if (left.length !== right.length) return false;
-    const used = new Array(right.length).fill(false);
-    return left.every((leftValue) => {
-        const index = right.findIndex(
-            (rightValue, candidate) =>
-                !used[candidate] && jsonValueEqual(leftValue, rightValue)
-        );
-        if (index === -1) return false;
-        used[index] = true;
-        return true;
-    });
-}
-
 export class YouchamaJsonDiffer {
     left: any;
     right: any;
@@ -214,6 +171,7 @@ export class YouchamaJsonDiffer {
     lcs_table_cache: { [key: string]: any };
     ignore_order_func: TreeLevelDiffFunc;
     event_pair_dict: { [key: string]: boolean };
+    business_policy: object | null;
 
     constructor(
         left: any,
@@ -244,6 +202,7 @@ export class YouchamaJsonDiffer {
         this.ignore_order_func =
             ignore_order_func || ((level: TreeLevel, drill: boolean) => false);
         this.event_pair_dict = {};
+        this.business_policy = null;
 
         this.__dict_remove_diff = this.__dict_remove_diff.bind(this);
         this.__dict_add_diff = this.__dict_add_diff.bind(this);
@@ -667,24 +626,25 @@ export class YouchamaJsonDiffer {
             }
         }
 
+        const maxLength = Math.max(level.left.length, level.right.length);
+        if (maxLength === 0) return 1;
+        let resolvedScore = pair_list.length;
         if (!drill) {
-            this._compare_list_without_order_post(pair_list, level);
+            resolvedScore = this._compare_list_without_order_post(pair_list, level);
         }
-
-        return (
-            pair_list.length / Math.max(level.left.length, level.right.length)
-        );
+        return resolvedScore / maxLength;
     }
 
     private _compare_list_without_order_post(
         pair_list: ListItemPair[],
         level: TreeLevel
-    ): void {
+    ): number {
         const matched_left_index: number[] = [];
         const matched_right_index: number[] = [];
 
+        let score = 0;
         pair_list.forEach((pair) => {
-            this.diff_level(pair.level, false);
+            score += this.diff_level(pair.level, false);
             this.report_pair(pair.level);
             matched_left_index.push(pair.left_index);
             matched_right_index.push(pair.right_index);
@@ -726,9 +686,10 @@ export class YouchamaJsonDiffer {
         removed.forEach((tl) => this.report(EVENT_LIST_REMOVE, tl));
         add.forEach((tl) => this.report(EVENT_LIST_ADD, tl));
         delta.forEach((tl) => {
-            this.diff_level(tl, false);
+            score += this.diff_level(tl, false);
             this.report_pair(tl);
         });
+        return score;
     }
 
     public compare_list(level: TreeLevel, drill: boolean): number {
@@ -948,6 +909,85 @@ export class YouchamaJsonDiffer {
         return this.diff_level(root_level, false) === 1;
     }
 
+    static fromPolicy(
+        left: any,
+        right: any,
+        policy: BusinessPolicyInput | BusinessDiffPolicy,
+        parameters: { debug?: boolean; use_cache?: boolean } = {}
+    ): YouchamaJsonDiffer {
+        const compiledPolicy =
+            policy instanceof BusinessDiffPolicy
+                ? policy
+                : new BusinessDiffPolicy(policy);
+        const differ = new YouchamaJsonDiffer(left, right, {
+            ...compiledPolicy.compile(),
+            ...parameters
+        });
+        differ.business_policy = compiledPolicy.toJSON();
+        return differ;
+    }
+
+    public explain(includeDiff: boolean = true) {
+        const equal = this.diff();
+        const diffResult = this.to_dict();
+        const standardEvents = new Set([
+            EVENT_DICT_ADD,
+            EVENT_DICT_REMOVE,
+            EVENT_LIST_ADD,
+            EVENT_LIST_REMOVE,
+            EVENT_VALUE_CHANGE
+        ]);
+        const eventCounts: { [key: string]: number } = {};
+        Object.keys(diffResult).forEach((event) => {
+            if (event !== EVENT_PAIR && diffResult[event].length) {
+                eventCounts[event] = diffResult[event].length;
+            }
+        });
+        const ruleEvents = Object.keys(eventCounts).filter(
+            (event) => !standardEvents.has(event)
+        );
+        const violations: any[] = [];
+        ruleEvents.forEach((event) =>
+            diffResult[event].forEach((record: any) => {
+                if (record.pass === false) violations.push({ event, ...record });
+            })
+        );
+        const affectedPaths = new Set<string>();
+        standardEvents.forEach((event) =>
+            (diffResult[event] || []).forEach((record: any) => {
+                const path = record.right_path || record.left_path;
+                if (path) affectedPaths.add(path);
+            })
+        );
+        violations.forEach((record) => {
+            const path = record.right_path || record.left_path;
+            if (path) affectedPaths.add(path);
+        });
+        const changeCount = Array.from(standardEvents).reduce(
+            (total, event) => total + (diffResult[event] || []).length,
+            0
+        );
+        const summary: { [key: string]: any } = {
+            equal,
+            change_count: changeCount,
+            rule_evaluation_count: ruleEvents.reduce(
+                (total, event) => total + eventCounts[event],
+                0
+            ),
+            rule_violation_count: violations.length,
+            matched_pair_count: (diffResult[EVENT_PAIR] || []).length,
+            affected_paths: Array.from(affectedPaths).sort(),
+            events: eventCounts
+        };
+        if (this.business_policy) summary.policy = this.business_policy;
+        return {
+            equal,
+            summary,
+            violations,
+            ...(includeDiff ? { diff: diffResult } : {})
+        };
+    }
+
     /** Build an RFC 6902 patch while respecting JYCM's semantic rules. */
     public to_json_patch(include_tests: boolean = false): JsonPatchOperation[] {
         const patchContext = Object.create(this) as YouchamaJsonDiffer;
@@ -980,7 +1020,12 @@ export class YouchamaJsonDiffer {
                     Array.isArray(left) &&
                     this.ignore_order_func(level, false)
                 ) {
-                    return unorderedListEqual(left, right);
+                    const isolated = new YouchamaJsonDiffer(left, right, {
+                        custom_operators: this.custom_operators,
+                        ignore_order_func: this.ignore_order_func,
+                        use_cache: this.use_cache
+                    });
+                    return isolated.diff_level(level, false) === 1;
                 }
                 return false;
             },

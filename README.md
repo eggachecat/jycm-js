@@ -71,23 +71,45 @@ const result = applyJsonPatch({ enabled: false }, patch);
 
 Inputs are copied by default. Pass `true` as the third argument to `applyJsonPatch`, or as the third argument to `differ.applyPatch`, only when in-place mutation is intentional.
 
-## Configure from JSON
+## Business Diff Policy
 
-Applications can store comparison policy as data:
+Store domain equality as a versioned JSON document and share it with Python:
 
 ```ts
-import { get_jycm_instance_from_json } from 'jycm';
+import { YouchamaJsonDiffer } from 'jycm';
 
-const differ = get_jycm_instance_from_json(before, after, {
-    operators: [
+const policy = {
+    version: 1,
+    name: 'order-contract',
+    rules: [
+        { name: 'items-as-set', path: '^items$', operation: 'unordered' },
         {
-            name: 'operator:list:matchWithField',
-            args: ['^users->\\[\\d+\\]$', 'id']
+            name: 'match-sku',
+            path: '^items->\\[\\d+\\]$',
+            operation: 'match_by',
+            options: { field: 'sku' }
+        },
+        {
+            name: 'money-rounding',
+            path: '^items->\\[\\d+\\]->price$',
+            operation: 'numeric_tolerance',
+            options: { absolute: 0.01, relative: 0.001 }
         }
-    ],
-    ignore_orders: ['^users$']
-});
+    ]
+};
+
+const differ = YouchamaJsonDiffer.fromPolicy(before, after, policy);
+const explanation = differ.explain();
+
+console.log(explanation.summary);
+console.log(explanation.violations);
+console.log(differ.toJsonPatch()); // respects the same policy
 ```
+
+Supported operations are `ignore`, `unordered`, `match_by`,
+`numeric_tolerance`, `string_normalize`, `expect_change`, `expect_exist`, and
+`range`. The original `get_jycm_instance_from_json` configuration remains
+supported for existing applications.
 
 ## Development
 
