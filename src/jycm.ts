@@ -10,6 +10,7 @@ import {
 } from './helper';
 import { KMMatcher } from './km_matcher';
 import { IJYCMOperator, getOperatorListFromJSON } from './operator';
+import { JsonPatchOperation, apply_json_patch, make_json_patch } from './patch';
 
 type TreeLevelDiffFunction = (
     treeLevel: TreeLevel,
@@ -157,6 +158,50 @@ class ListItemPair {
 type TreeLevelDiffFunc = (level: TreeLevel, drill: boolean) => boolean;
 type RecordList = Array<JYCMRecord>;
 
+function jsonValueEqual(left: any, right: any): boolean {
+    if (left === right) return true;
+    if (Array.isArray(left) && Array.isArray(right)) {
+        return (
+            left.length === right.length &&
+            left.every((value, index) => jsonValueEqual(value, right[index]))
+        );
+    }
+    if (
+        left !== null &&
+        right !== null &&
+        typeof left === 'object' &&
+        typeof right === 'object' &&
+        !Array.isArray(left) &&
+        !Array.isArray(right)
+    ) {
+        const leftKeys = Object.keys(left);
+        const rightKeys = Object.keys(right);
+        return (
+            leftKeys.length === rightKeys.length &&
+            leftKeys.every(
+                (key) =>
+                    Object.prototype.hasOwnProperty.call(right, key) &&
+                    jsonValueEqual(left[key], right[key])
+            )
+        );
+    }
+    return false;
+}
+
+function unorderedListEqual(left: any[], right: any[]): boolean {
+    if (left.length !== right.length) return false;
+    const used = new Array(right.length).fill(false);
+    return left.every((leftValue) => {
+        const index = right.findIndex(
+            (rightValue, candidate) =>
+                !used[candidate] && jsonValueEqual(leftValue, rightValue)
+        );
+        if (index === -1) return false;
+        used[index] = true;
+        return true;
+    });
+}
+
 export class YouchamaJsonDiffer {
     left: any;
     right: any;
@@ -253,60 +298,31 @@ export class YouchamaJsonDiffer {
         right_size: number,
         dp_table: number[][]
     ): ListItemPair[] {
-        if (left_size === 0 || right_size === 0) {
-            return [];
-        }
-
-        if (
-            this.diff_level(
-                new TreeLevel(
-                    level.left[left_size - 1],
-                    level.right[right_size - 1],
-                    [...level.left_path, left_size - 1],
-                    [...level.right_path, right_size - 1],
-                    level
-                ),
-                true
-            ) === 1
-        ) {
-            return this._generate_lcs_pair_list(
-                level,
-                left_size - 1,
-                right_size - 1,
-                dp_table
-            ).concat(
-                new ListItemPair(
-                    new TreeLevel(
-                        level.left[left_size - 1],
-                        level.right[right_size - 1],
-                        [...level.left_path, left_size - 1],
-                        [...level.right_path, right_size - 1],
-                        level
-                    ),
-                    left_size - 1,
-                    right_size - 1
-                )
+        const pairs: ListItemPair[] = [];
+        let leftIndex = left_size;
+        let rightIndex = right_size;
+        while (leftIndex > 0 && rightIndex > 0) {
+            const pairLevel = new TreeLevel(
+                level.left[leftIndex - 1],
+                level.right[rightIndex - 1],
+                [...level.left_path, leftIndex - 1],
+                [...level.right_path, rightIndex - 1],
+                level
             );
+            if (this.diff_level(pairLevel, true) === 1) {
+                pairs.push(new ListItemPair(pairLevel, leftIndex - 1, rightIndex - 1));
+                leftIndex--;
+                rightIndex--;
+            } else if (
+                dp_table[leftIndex - 1][rightIndex] >
+                dp_table[leftIndex][rightIndex - 1]
+            ) {
+                leftIndex--;
+            } else {
+                rightIndex--;
+            }
         }
-
-        if (
-            dp_table[left_size - 1][right_size] >
-            dp_table[left_size][right_size - 1]
-        ) {
-            return this._generate_lcs_pair_list(
-                level,
-                left_size - 1,
-                right_size,
-                dp_table
-            );
-        } else {
-            return this._generate_lcs_pair_list(
-                level,
-                left_size,
-                right_size - 1,
-                dp_table
-            );
-        }
+        return pairs.reverse();
     }
 
     /**  To fill the lookup table by finding the length of LCS of substring `X[0…m-1]` and `Y[0…n-1]` */
@@ -930,6 +946,67 @@ export class YouchamaJsonDiffer {
     public diff(): boolean {
         const root_level = new TreeLevel(this.left, this.right, [], [], null);
         return this.diff_level(root_level, false) === 1;
+    }
+
+    /** Build an RFC 6902 patch while respecting JYCM's semantic rules. */
+    public to_json_patch(include_tests: boolean = false): JsonPatchOperation[] {
+        const patchContext = Object.create(this) as YouchamaJsonDiffer;
+        patchContext.report = () => undefined;
+
+        return make_json_patch(
+            this.left,
+            this.right,
+            (left, right, leftPath, rightPath) => {
+                const level = new TreeLevel(
+                    left,
+                    right,
+                    leftPath,
+                    rightPath,
+                    null
+                );
+
+                for (const operator of this.custom_operators) {
+                    if (operator.match(level)) {
+                        const { skip, score } = operator.diff(
+                            level,
+                            patchContext,
+                            false
+                        );
+                        if (skip) return score === 1;
+                    }
+                }
+
+                if (
+                    Array.isArray(left) &&
+                    this.ignore_order_func(level, false)
+                ) {
+                    return unorderedListEqual(left, right);
+                }
+                return false;
+            },
+            include_tests
+        );
+    }
+
+    /** Apply a patch, defaulting to this comparison's generated patch. */
+    public apply_patch(
+        document: any = this.left,
+        patch: JsonPatchOperation[] = this.to_json_patch(),
+        in_place: boolean = false
+    ): any {
+        return apply_json_patch(document, patch, in_place);
+    }
+
+    public toJsonPatch(includeTests: boolean = false): JsonPatchOperation[] {
+        return this.to_json_patch(includeTests);
+    }
+
+    public applyPatch(
+        document: any = this.left,
+        patch: JsonPatchOperation[] = this.to_json_patch(),
+        inPlace: boolean = false
+    ): any {
+        return this.apply_patch(document, patch, inPlace);
     }
 
     public get_diff(no_pairs: boolean = false): { [key: string]: any } {
