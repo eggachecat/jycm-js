@@ -223,7 +223,11 @@ describe('BusinessDiffPolicy', () => {
         });
 
         const policy = new BusinessDiffPolicy([
-            { operation: 'numeric_tolerance', path: '^amount$' },
+            {
+                operation: 'numeric_tolerance',
+                path: '^amount$',
+                options: { relative: 0.1 }
+            },
             { operation: 'string_normalize', path: '^label$' }
         ]);
         expect(
@@ -234,7 +238,7 @@ describe('BusinessDiffPolicy', () => {
             ).diff()
         ).toBe(true);
         expect(policy.toJSON().rules).toMatchObject([
-            { name: 'rule-1', options: {} },
+            { name: 'rule-1', options: { relative: 0.1 } },
             { name: 'rule-2', options: {} }
         ]);
     });
