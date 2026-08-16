@@ -111,6 +111,15 @@ Supported operations are `ignore`, `unordered`, `match_by`,
 `range`. The original `get_jycm_instance_from_json` configuration remains
 supported for existing applications.
 
+## Agent-assisted policy design
+
+The ecosystem includes a portable
+[`jycm-business-diff` Agent Skill](https://github.com/eggachecat/jycm/tree/master/skills/jycm-business-diff)
+for Codex, Claude Code, and other Agent Skills compatible clients. It guides an
+agent through domain examples, Policy authoring, fixture validation, Patch
+verification, UI integration, and deployment safeguards. The bundled installer
+supports both user-wide and project-scoped installations.
+
 ## Development
 
 ```bash
