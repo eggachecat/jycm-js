@@ -6,6 +6,8 @@ export * from './jycm';
 export * from './operator';
 export * from './helper';
 export * from './km_matcher';
+export * from './patch';
+export * from './policy';
 
 export function get_jycm_instance_from_json(
     left: any,

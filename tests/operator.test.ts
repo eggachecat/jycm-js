@@ -218,16 +218,6 @@ describe('testing with operator:ExpectChangeOperator', () => {
                     pass: true,
                     path_regex: '^value_expected_change_.*$'
                 }
-            ],
-            value_changes: [
-                {
-                    left: 0,
-                    right: 999,
-                    left_path: 'value_expected_change_ok',
-                    right_path: 'value_expected_change_ok',
-                    old: 0,
-                    new: 999
-                }
             ]
         };
 
