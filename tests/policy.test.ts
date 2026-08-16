@@ -242,4 +242,27 @@ describe('BusinessDiffPolicy', () => {
             { name: 'rule-2', options: {} }
         ]);
     });
+
+    test('explains both sides of an out-of-range business value', () => {
+        const explanation = YouchamaJsonDiffer.fromPolicy(
+            { score: -1 },
+            { score: 11 },
+            [
+                {
+                    name: 'valid-score',
+                    operation: 'range',
+                    path: '^score$',
+                    options: { start: 0, end: 10 }
+                }
+            ]
+        ).explain();
+
+        expect(explanation.equal).toBe(false);
+        expect(explanation.violations[0]).toMatchObject({
+            rule: 'valid-score',
+            left_invalid: true,
+            right_invalid: true,
+            pass: false
+        });
+    });
 });
