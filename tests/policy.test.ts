@@ -134,9 +134,30 @@ describe('BusinessDiffPolicy', () => {
     });
 
     test('rejects invalid policies with actionable messages', () => {
+        expect(() => new BusinessDiffPolicy(null as any)).toThrow(
+            'policy must be an object or a list of rules'
+        );
         expect(() => new BusinessDiffPolicy({ version: 2, rules: [] })).toThrow(
             'unsupported policy version: 2'
         );
+        expect(
+            () => new BusinessDiffPolicy({ version: 1, rules: {} as any })
+        ).toThrow('policy.rules must be a list');
+        expect(() => new BusinessDiffPolicy([null as any])).toThrow(
+            'rule 0 must be an object'
+        );
+        expect(
+            () => new BusinessDiffPolicy([{ operation: 'unknown', path: '^x$' }])
+        ).toThrow('rule 0 has unsupported operation: unknown');
+        expect(
+            () => new BusinessDiffPolicy([{ operation: 'ignore', path: '' }])
+        ).toThrow('rule 0 requires a non-empty path regex');
+        expect(
+            () =>
+                new BusinessDiffPolicy([
+                    { operation: 'ignore', path: '^x$', options: [] as any }
+                ])
+        ).toThrow('rule 0 options must be an object');
         expect(
             () =>
                 new BusinessDiffPolicy([
@@ -159,5 +180,35 @@ describe('BusinessDiffPolicy', () => {
                     { operation: 'range', path: '^score$', options: {} }
                 ]).compile()
         ).toThrow(BusinessPolicyError);
+    });
+
+    test('reports missing values for expect-exist rules on either side', () => {
+        const policy = new BusinessDiffPolicy([
+            { name: 'required-status', operation: 'expect_exist', path: '^status$' }
+        ]);
+
+        const missingLeft = YouchamaJsonDiffer.fromPolicy(
+            {},
+            { status: 'ready' },
+            policy
+        ).explain();
+        expect(missingLeft.equal).toBe(false);
+        expect(missingLeft.violations[0]).toMatchObject({
+            rule: 'required-status',
+            left_non_exist: true,
+            pass: false
+        });
+
+        const missingRight = YouchamaJsonDiffer.fromPolicy(
+            { status: 'ready' },
+            {},
+            policy
+        ).explain();
+        expect(missingRight.equal).toBe(false);
+        expect(missingRight.violations[0]).toMatchObject({
+            rule: 'required-status',
+            right_non_exist: true,
+            pass: false
+        });
     });
 });
