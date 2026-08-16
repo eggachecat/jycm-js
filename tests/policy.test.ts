@@ -211,4 +211,31 @@ describe('BusinessDiffPolicy', () => {
             pass: false
         });
     });
+
+    test('uses safe defaults for empty policies and optional rule settings', () => {
+        expect(new BusinessDiffPolicy().toJSON()).toEqual({
+            version: 1,
+            rules: []
+        });
+        expect(new BusinessDiffPolicy({}).to_dict()).toEqual({
+            version: 1,
+            rules: []
+        });
+
+        const policy = new BusinessDiffPolicy([
+            { operation: 'numeric_tolerance', path: '^amount$' },
+            { operation: 'string_normalize', path: '^label$' }
+        ]);
+        expect(
+            YouchamaJsonDiffer.fromPolicy(
+                { amount: 1, label: ' value ' },
+                { amount: 1, label: 'value' },
+                policy
+            ).diff()
+        ).toBe(true);
+        expect(policy.toJSON().rules).toMatchObject([
+            { name: 'rule-1', options: {} },
+            { name: 'rule-2', options: {} }
+        ]);
+    });
 });
