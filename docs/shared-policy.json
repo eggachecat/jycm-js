@@ -1,0 +1,58 @@
+{
+  "policy": {
+    "version": 1,
+    "name": "shared-order-contract",
+    "rules": [
+      {
+        "path": "^items$",
+        "operation": "unordered"
+      },
+      {
+        "path": "^items->\\[\\d+\\]$",
+        "operation": "match_by",
+        "options": {
+          "field": "sku"
+        }
+      },
+      {
+        "path": "^items->\\[\\d+\\]->price$",
+        "operation": "numeric_tolerance",
+        "options": {
+          "absolute": 0.02
+        }
+      },
+      {
+        "path": "^trace_id$",
+        "operation": "ignore"
+      }
+    ]
+  },
+  "before": {
+    "trace_id": "old",
+    "items": [
+      {
+        "sku": "A",
+        "price": 10
+      },
+      {
+        "sku": "B",
+        "price": 20
+      }
+    ]
+  },
+  "after": {
+    "trace_id": "new",
+    "items": [
+      {
+        "sku": "B",
+        "price": 20.01
+      },
+      {
+        "sku": "A",
+        "price": 10.01
+      }
+    ]
+  },
+  "expected_equal": true,
+  "expected_patch": []
+}
