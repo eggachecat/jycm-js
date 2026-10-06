@@ -6,6 +6,32 @@ JYCM is a semantic JSON diff and RFC 6902 JSON Patch library for JavaScript and 
 
 Use it for API regression testing, configuration drift, audit workflows, data migration validation, and any JSON comparison where ordinary structural diff creates too much noise.
 
+## Choose a JYCM project
+
+JYCM is a family of tools for comparing JSON with explicit business rules.
+
+| Project | Use it for |
+| --- | --- |
+| [jycm](https://github.com/eggachecat/jycm) | Python comparisons, CLI reports, and business policies |
+| [jycm-js](https://github.com/eggachecat/jycm-js) | JavaScript / TypeScript comparisons in Node.js and browsers; npm package `jycm` |
+| [react-jycm-viewer](https://github.com/eggachecat/react-jycm-viewer) | Embedding a visual JSON diff or JSON Patch viewer in React |
+| [jycm-json-diff-viewer](https://github.com/eggachecat/jycm-json-diff-viewer) | Trying comparisons in the online playground and studying an integration example |
+
+[Try the playground](https://eggachecat.github.io/jycm-json-diff-viewer/) ·
+[Task guides](https://github.com/eggachecat/jycm/tree/master/docs/source/guides) ·
+[Algorithm paper](https://arxiv.org/abs/2305.05865)
+
+## Source and package versions
+
+This README describes the repository's default branch. Package registries and
+the deployed playground may contain earlier releases. Before integrating
+Business Diff Policy or JSON Patch APIs, confirm that your installed version
+exports the APIs used here. For development against this source, follow the
+repository's development instructions. Pin the tested package version in your
+application; a policy `version: 1` identifies the policy format, not a package
+version or a guarantee of identical behavior across every Python/JavaScript
+input. Validate your own fixtures in both runtimes.
+
 ## Install
 
 ```bash
@@ -71,6 +97,8 @@ const result = applyJsonPatch({ enabled: false }, patch);
 
 Inputs are copied by default. Pass `true` as the third argument to `applyJsonPatch`, or as the third argument to `differ.applyPatch`, only when in-place mutation is intentional.
 
+[Run a shared Python / JavaScript policy fixture](docs/shared-policy.md).
+
 ## Business Diff Policy
 
 Store domain equality as a versioned JSON document and share it with Python:
@@ -98,7 +126,9 @@ const policy = {
     ]
 };
 
-const differ = YouchamaJsonDiffer.fromPolicy(before, after, policy);
+const orderBefore = { items: [{ sku: 'A', price: 10 }] };
+const orderAfter = { items: [{ sku: 'A', price: 10.005 }] };
+const differ = YouchamaJsonDiffer.fromPolicy(orderBefore, orderAfter, policy);
 const explanation = differ.explain();
 
 console.log(explanation.summary);
